@@ -9,13 +9,13 @@ trap "rm -rf $TMPDIR" EXIT
 
 # Значения по умолчанию
 HTML_FILE="index.html"
-QUALITY=360
+QUALITY=720
 
 # Список допустипых значений качества видео
 AVAILABLE_QUALITY=(360 480 720 1080)
 AVAILABLE_QUALITY_STR=$(echo "${AVAILABLE_QUALITY[*]}" | sed 's/ /, /g')
 
-# Текущие глобальные значение
+# Текущие глобальные значения
 html_file="$HTML_FILE"
 video_name="${HTML_FILE%.*}"
 quality=$QUALITY
@@ -76,7 +76,7 @@ ask_html_page_name() {
 # Запрос имени видео для сохранения
 ask_video_name() {
     while true; do
-        read -p "Название для сохранения (текущее: '$video_name'): " input
+        read -rp "Название для сохранения (текущее: '$video_name'): " input
 
         input=$(echo "$input" | xargs)
 
@@ -97,7 +97,7 @@ ask_video_name() {
 # Запрос качества видео
 ask_video_quality() {
     while true; do
-        read -p "Качество видео (текущее: $quality): " input
+        read -rp "Качество видео (текущее: $quality): " input
 
         input=$(echo "$input" | xargs)
 
@@ -132,9 +132,9 @@ find_all_player_links() {
 
     # Ниже можно добавить другой способ поиска ссылок на плеер
     # И результатом конкатинировать все полученные значения новой строкой
-    # $another_one=$(...)
+    another_one=$(echo -n "")
 
-    echo $(printf "%s\n \n  " $iframe_result)
+    printf "%b\n%b" "$iframe_result" "$another_one"
 }
 
 # Запрос страницы плеера, который форматирован gzip
@@ -169,9 +169,9 @@ find_playlist_url() {
 
     # Ниже можно добавить другой способ поиска ссылки на список качеств
     # И результатом конкатинировать все полученные значения новой строкой
-    # $another_one=$(...)
+    another_one=$(echo -n "")
 
-    echo $(printf "%s" $matser_url)
+    printf "%b\n%b" "$matser_url" "$another_one"
 }
 
 # Поиск выбранного качества видео в плейлисте
@@ -238,7 +238,7 @@ download_video() {
 main() {
     ask_html_page_name
 
-    local found_links=$(find_all_player_links)
+    local found_links=$(find_all_player_links | awk 'NF')
     local found_links_count=$(echo "$found_links" | grep -cve '^\s*$')
 
     if [ $found_links_count -eq 0 ]; then
@@ -275,7 +275,7 @@ main() {
             continue
         fi
 
-        local playlist_url=$(find_playlist_url "$file_html")
+        local playlist_url=$(find_playlist_url "$file_html" | xargs)
 
         if [ -z "$playlist_url" ]; then
             log "Внимание: список вариантов качества видео не удалось получить"
@@ -284,7 +284,7 @@ main() {
             continue
         fi
 
-        local media_url=$(find_media_quality "$playlist_url")
+        local media_url=$(find_media_quality "$playlist_url" | xargs)
 
         if [ -z "$media_url" ]; then
             log "Внимание: видео с качеством $quality не найден, попробуйте указать другое значение"
