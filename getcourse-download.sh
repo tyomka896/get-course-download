@@ -312,6 +312,7 @@ main() {
 
 check_dependencies
 greeting_message
+
 main
 echo
 
@@ -332,4 +333,4 @@ while true; do
     fi
 done
 
-# press_to_continue
+press_to_continue

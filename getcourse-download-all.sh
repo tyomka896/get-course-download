@@ -265,6 +265,10 @@ main() {
     local html_files=$(find . -maxdepth 1 -type f -name "*.html" -print)
 
     while read -r html_file; do
+        if [ ! -e "$html_file" ]; then
+            continue
+        fi
+
         log "Обработка файла: $html_file"
 
         local found_links=$(find_all_player_links "$html_file" | awk 'NF')
@@ -281,5 +285,9 @@ main() {
 check_dependencies
 greeting_message
 ask_video_quality
+
 echo
 main
+
+echo
+press_to_continue
