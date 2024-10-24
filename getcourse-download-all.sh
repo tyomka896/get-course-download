@@ -8,7 +8,6 @@ export TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
 
 # Значения по умолчанию
-HTML_FILE="index.html"
 QUALITY=720
 
 # Список допустипых значений качества видео
@@ -16,8 +15,6 @@ AVAILABLE_QUALITY=(360 480 720 1080)
 AVAILABLE_QUALITY_STR=$(echo "${AVAILABLE_QUALITY[*]}" | sed 's/ /, /g')
 
 # Текущие глобальные значения
-html_file="$HTML_FILE"
-video_name="${HTML_FILE%.*}"
 quality=$QUALITY
 
 log() {
@@ -41,10 +38,9 @@ check_dependencies() {
 }
 
 greeting_message() {
-    echo "# Этот скрипт позволяет извлекать ссылки на видео из указанной HTML-страницы"
+    echo "# Этот скрипт позволяет извлекать ссылки на видео из HTML-страниц,"
+    echo "# которые находятся в текущей директории скрипта"
     echo "# и автоматически скачивать их на твой компьютер."
-    echo "# Укажи путь до HTML-страницы относительно текущего скрипта,"
-    echo "# затем введи название видео для сохранения и желаемое качество скачивания."
     echo
 }
 
@@ -59,49 +55,6 @@ show_progress() {
         printf " "
     done
     printf "] %d%%" "$percent"
-}
-
-# Запрос пути с именем HTML-документа
-ask_html_page_name() {
-    while true; do
-        read -p "Введи путь с названием HTML-файла: " input
-
-        input=$(echo "$input" | xargs)
-
-        if [ -f "$input" ]; then
-            html_file="$input"
-
-            video_name="${html_file%.*}"
-            video_name="${video_name:0:100}"
-
-            break
-        elif [ -z "$input" ]; then
-            log "Внимание: название не может быть пустым"
-        else
-            log "Внимание: файл '$input' не найден"
-        fi
-    done
-}
-
-# Запрос имени видео для сохранения
-ask_video_name() {
-    while true; do
-        read -rp "Название для сохранения (текущее: '$video_name'): " input
-
-        input=$(echo "$input" | xargs)
-
-        if [ -z "$input" ]; then
-            break
-        fi
-
-        if [[ -n "$input" && ${#input} -lt 100 ]]; then
-            video_name="$input"
-
-            break
-        fi
-
-        log "Внимание: необходимо ввести строку длиной до 100 символов."
-    done
 }
 
 # Запрос качества видео
@@ -127,6 +80,8 @@ ask_video_quality() {
 
 # Поиск ссылок для плееры на странице
 find_all_player_links() {
+    html_file="$1"
+
     # Это вполне прямой подход подиска ссылок на HTML-документе
     # Поиск ссылки плеера в теге <iframe src="link" . . .></iframe>
     # Попытка найти все значения link в документе
@@ -208,7 +163,7 @@ download_video() {
 
     local playlist_path=$(mktemp)
 
-    local base_url="$2/$QUALITY"
+    local base_url="$2/$quality"
 
     curl -sLo "$playlist_path" "$base_url"
 
@@ -245,10 +200,10 @@ download_video() {
     echo
 }
 
-main() {
-    ask_html_page_name
+download_all_links() {
+    local found_links=$1
+    local save_as=$2
 
-    local found_links=$(find_all_player_links | awk 'NF')
     local found_links_count=$(echo "$found_links" | grep -cve '^\s*$')
 
     if [ $found_links_count -eq 0 ]; then
@@ -260,14 +215,10 @@ main() {
 
     log "Удалось найти ссылок на плеер: $found_links_count"
 
-    ask_video_name
-    ask_video_quality
-    echo
-
     local media_count=1
 
     while IFS= read -r url; do
-        save_video_as="$video_name"
+        save_video_as="$save_as"
 
         if [ $found_links_count -gt 1 ]; then
             save_video_as="$save_video_as $media_count"
@@ -310,26 +261,25 @@ main() {
     done <<<"$found_links"
 }
 
+main() {
+    local html_files=$(find . -maxdepth 1 -type f -name "*.html" -print)
+
+    while read -r html_file; do
+        log "Обработка файла: $html_file"
+
+        local found_links=$(find_all_player_links "$html_file" | awk 'NF')
+
+        local video_name="${html_file%.*}"
+        local video_name="${video_name:0:100}"
+
+        download_all_links "$found_links" "$video_name"
+
+        echo
+    done <<<"$html_files"
+}
+
 check_dependencies
 greeting_message
-main
+ask_video_quality
 echo
-
-while true; do
-    read -p "Повторить скачивание видео? (Да/нет): " answer
-
-    answer="${answer,,}"
-    letter="${answer:0:1}"
-
-    if [[ "$letter" == "д" || "$letter" == "y" || -z "$letter" ]]; then
-        echo
-        main
-        echo
-    elif [[ "$letter" == "н" || "$letter" == "n" ]]; then
-        break
-    else
-        log "Пожалуйста, ответь 'да' или 'нет'"
-    fi
-done
-
-# press_to_continue
+main
